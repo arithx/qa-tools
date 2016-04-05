@@ -24,8 +24,7 @@ the following format:
 
     {
         "test_name": {
-            "status": enum("Pass", "Skip", "Error,
-                           "Fail", "Fixture Failure", "Not Ran"),
+            "status": enum("Pass", "Skip", "Error, "Fail", "Fixture Failure", "Not Ran"),
             "message": "Error message if applicable"
         }
     }
