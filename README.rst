@@ -3,7 +3,7 @@ qa-tools
 
 A collection of tools primarily focused on extending current OpenStack tooling.
 
-subunit_verify
+subunit-verify
 --------------
 
 Takes a list of tests that were ran through tempest and a subunit stream and
@@ -55,11 +55,14 @@ The format of the output file is in JSON and follows the following structure:
     }
 
 
-test_loader
+test-loader
 -----------
 
 Takes a given list of tests, updates the test names to properly add idempotent
 id's and tags, and runs subunit-verify on the results.
+
+NOTE: This requires the refstack-client tool. Please install it from
+http://github.com/openstack/refstack-client before using test-loader
 
 ::
 
