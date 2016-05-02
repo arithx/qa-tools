@@ -64,17 +64,3 @@ The JSON follows this structure:
   {
       "<port number>": "<name of service>"
   }
-
-
-test-loader
------------
-
-Takes a given list of tests, updates the test names to properly add idempotent
-id's and tags, and runs subunit-verify on the results.
-
-NOTE: This requires the refstack-client tool. Please install it from
-http://github.com/openstack/refstack-client before using test-loader
-
-::
-
-    test-loader [-t/--test-list] [-p/--tempest-path] [-c/--concurrency] [-o/--output-file]
