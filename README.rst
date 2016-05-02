@@ -37,9 +37,9 @@ Outputs all HTTP calls, in the order they were made, for a given test.
 
 ::
 
-    subunit-describe-calls [-s/--subunit] [-n/--non-subunit-name] [-o/--output-file]
+    subunit-describe-calls [-s/--subunit] [-n/--non-subunit-name] [-o/--output-file] [-p/--ports]
 
-The format of the output file is in JSON and follows the following structure:
+The format of the output file is in JSON and follows this structure:
 
 ::
 
@@ -53,6 +53,17 @@ The format of the output file is in JSON and follows the following structure:
             }
         ]
     }
+
+The format of the ports file is in JSON. All services must be described in the ports file,
+if a ports file is not given it will default to using the defaults from the Kilo release
+(http://docs.openstack.org/kilo/config-reference/content/firewalls-default-ports.html).
+The JSON follows this structure:
+
+::
+
+  {
+      "<port number>": "<name of service>"
+  }
 
 
 test-loader

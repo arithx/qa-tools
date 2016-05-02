@@ -5,6 +5,7 @@ import argparse
 import collections
 import io
 import json
+import os
 import re
 
 import subunit
@@ -18,33 +19,36 @@ class UrlParser(testtools.TestResult):
                         '[0-9a-z]{4}[0-9a-z]{12}([^0-9a-z]|$)')
     ip_re = re.compile(r'(^|[^0-9])[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]'
                         '{1,3}([^0-9]|$)')
+    url_re = re.compile(r'.*INFO.*Request \((?P<name>.*)\): [\d]{3} '
+                         '(?P<verb>\w*) (?P<url>.*) .*')
+    port_re = re.compile(r'.*:(?P<port>\d+).*')
+    path_re = re.compile(r'http[s]?://[^/]*/(?P<path>.*)')
 
     # Based on kilo defaults:
     # http://docs.openstack.org/kilo/config-reference/content/firewalls-default-ports.html
     services = {
-        8776: "Block Storage",
-        8774: "Nova",
-        8773: "Nova-API", 8775: "Nova-API",
-        8386: "Sahara",
-        35357: "Keystone", 5000: "Keystone",
-        9292: "Glance", 9191: "Glance",
-        9696: "Neutron",
-        6000: "Swift", 6001: "Swift", 6002: "Swift",
-        8004: "Heat", 8000: "Heat", 8003: "Heat",
-        8777: "Ceilometer",
-        80: "Horizon",
-        8080: "Swift",
-        443: "SSL",
-        873: "rsync",
-        3260: "iSCSI",
-        3306: "MySQL",
-        5672: "AMQP"}
+        "8776": "Block Storage",
+        "8774": "Nova",
+        "8773": "Nova-API", "8775": "Nova-API",
+        "8386": "Sahara",
+        "35357": "Keystone", "5000": "Keystone",
+        "9292": "Glance", "9191": "Glance",
+        "9696": "Neutron",
+        "6000": "Swift", "6001": "Swift", "6002": "Swift",
+        "8004": "Heat", "8000": "Heat", "8003": "Heat",
+        "8777": "Ceilometer",
+        "80": "Horizon",
+        "8080": "Swift",
+        "443": "SSL",
+        "873": "rsync",
+        "3260": "iSCSI",
+        "3306": "MySQL",
+        "5672": "AMQP"}
 
-    def __init__(self):
+    def __init__(self, services=None):
         super(UrlParser, self).__init__()
         self.test_logs = {}
-        self.pat = (".*INFO.*Request \((?P<name>.*)\): [\d]{3} "
-                    "(?P<verb>\w*) (?P<url>.*) .*")
+        self.services = services or self.services
 
     def addSuccess(self, test, details=None):
         output = test.shortDescription() or test.id()
@@ -79,7 +83,7 @@ class UrlParser(testtools.TestResult):
         calls = []
         for _, detail in details.items():
             for line in detail.as_text().split("\n"):
-                match = re.match(self.pat, line)
+                match = self.url_re.match(line)
                 if match is not None:
                     calls.append({
                         "name": match.group("name"),
@@ -90,13 +94,13 @@ class UrlParser(testtools.TestResult):
         return calls
 
     def get_service(self, url):
-        match = re.match(".*:(?P<port>\d+).*", url)
+        match = self.port_re.match(url)
         if match is not None:
-            return self.services.get(int(match.group("port")), "Unknown")
+            return self.services.get(match.group("port"), "Unknown")
         return "Unknown"
 
     def url_path(self, url):
-        match = re.match("http[s]?://[^/]*/(?P<path>.*)", url)
+        match = self.path_re.match(url)
         if match is not None:
             path = match.group("path")
             path = self.uuid_re.sub(r'\1<uuid>\2', path)
@@ -129,7 +133,7 @@ class ArgumentParser(argparse.ArgumentParser):
         desc = "Outputs all HTTP calls a given test made that were logged."
         usage_string = """
             subunit-describe-calls [-s/--subunit] [-n/--non-subunit-name]
-                    [-o/--output-file]
+                    [-o/--output-file] [-p/--ports]
         """
 
         super(ArgumentParser, self).__init__(
@@ -150,9 +154,16 @@ class ArgumentParser(argparse.ArgumentParser):
             "-o", "--output-file", metavar="<output file>", default=None,
             help="The output file name for the json.")
 
+        self.add_argument(
+            "-p", "--ports", metavar="<ports file>", default=None,
+            help="A JSON file describing the ports for each service.")
 
-def parse(subunit_file, non_subunit_name):
-    url_parser = UrlParser()
+
+def parse(subunit_file, non_subunit_name, ports):
+    if ports is not None and os.path.exists(ports):
+        ports = json.loads(open(ports).read())
+
+    url_parser = UrlParser(ports)
     stream = open(subunit_file, 'rb')
     suite = subunit.ByteStreamToStreamResult(
         stream, non_subunit_name=non_subunit_name)
@@ -179,5 +190,5 @@ def output(url_parser, output_file):
 
 def entry_point():
     cl_args = ArgumentParser().parse_args()
-    parser = parse(cl_args.subunit, cl_args.non_subunit_name)
+    parser = parse(cl_args.subunit, cl_args.non_subunit_name, cl_args.ports)
     output(parser, cl_args.output_file)
