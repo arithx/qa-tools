@@ -1,6 +1,21 @@
 #!/usr/bin/python
 #
 
+# Copyright 2016 Stephen Lowrie
+# All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License. You may obtain
+# a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations
+# under the License.
+
 import argparse
 import collections
 import io
@@ -14,18 +29,22 @@ import testtools
 
 class UrlParser(testtools.TestResult):
     uuid_re = re.compile(r'(^|[^0-9a-f])[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-'
-                          '[0-9a-f]{4}-[0-9a-f]{12}([^0-9a-f]|$)')
+                         '[0-9a-f]{4}-[0-9a-f]{12}([^0-9a-f]|$)')
     id_re = re.compile(r'(^|[^0-9a-z])[0-9a-z]{8}[0-9a-z]{4}[0-9a-z]{4}'
-                        '[0-9a-z]{4}[0-9a-z]{12}([^0-9a-z]|$)')
+                       '[0-9a-z]{4}[0-9a-z]{12}([^0-9a-z]|$)')
     ip_re = re.compile(r'(^|[^0-9])[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]'
-                        '{1,3}([^0-9]|$)')
-    url_re = re.compile(r'.*INFO.*Request \((?P<name>.*)\): [\d]{3} '
-                         '(?P<verb>\w*) (?P<url>.*) .*')
+                       '{1,3}([^0-9]|$)')
+    url_re = re.compile(r'.*INFO.*Request \((?P<name>.*)\): (?P<code>[\d]{3}) '
+                        '(?P<verb>\w*) (?P<url>.*) .*')
     port_re = re.compile(r'.*:(?P<port>\d+).*')
     path_re = re.compile(r'http[s]?://[^/]*/(?P<path>.*)')
+    request_re = re.compile(r'.* Request - Headers: (?P<headers>.*)')
+    response_re = re.compile(r'.* Response - Headers: (?P<headers>.*)')
+    body_re = re.compile(r'.*Body: (?P<body>.*)')
 
     # Based on kilo defaults:
-    # http://docs.openstack.org/kilo/config-reference/content/firewalls-default-ports.html
+    # http://docs.openstack.org/kilo/config-reference/
+    # content/firewalls-default-ports.html
     services = {
         "8776": "Block Storage",
         "8774": "Nova",
@@ -82,14 +101,42 @@ class UrlParser(testtools.TestResult):
 
         calls = []
         for _, detail in details.items():
+            in_request = False
+            in_response = False
+            current_call = {}
             for line in detail.as_text().split("\n"):
-                match = self.url_re.match(line)
-                if match is not None:
-                    calls.append({
-                        "name": match.group("name"),
-                        "verb": match.group("verb"),
-                        "service": self.get_service(match.group("url")),
-                        "url": self.url_path(match.group("url"))})
+                url_match = self.url_re.match(line)
+                request_match = self.request_re.match(line)
+                response_match = self.response_re.match(line)
+                body_match = self.body_re.match(line)
+
+                if url_match is not None:
+                    if current_call != {}:
+                        calls.append(current_call.copy())
+                        current_call = {}
+                        in_request, in_response = False, False
+                    current_call.update({
+                        "name": url_match.group("name"),
+                        "verb": url_match.group("verb"),
+                        "status_code": url_match.group("code"),
+                        "service": self.get_service(url_match.group("url")),
+                        "url": self.url_path(url_match.group("url"))})
+                elif request_match is not None:
+                    in_request = True
+                    current_call.update({"request_headers": request_match.group(
+                        "headers")})
+                elif in_request and body_match is not None:
+                    in_request = False
+                    current_call.update({"request_body": body_match.group("body")})
+                elif response_match is not None:
+                    in_response = True
+                    current_call.update({"response_headers": response_match.group(
+                        "headers")})
+                elif in_response and body_match is not None:
+                    in_response = False
+                    current_call.update({"response_body": body_match.group("body")})
+            if current_call != {}:
+                calls.append(current_call.copy())
 
         return calls
 
@@ -133,7 +180,7 @@ class ArgumentParser(argparse.ArgumentParser):
         desc = "Outputs all HTTP calls a given test made that were logged."
         usage_string = """
             subunit-describe-calls [-s/--subunit] [-n/--non-subunit-name]
-                    [-o/--output-file] [-p/--ports]
+                                   [-o/--output-file] [-p/--ports]
         """
 
         super(ArgumentParser, self).__init__(
@@ -142,7 +189,7 @@ class ArgumentParser(argparse.ArgumentParser):
         self.prog = "Argument Parser"
 
         self.add_argument(
-            "-s", "--subunit", metavar="<subunit file>",
+            "-s", "--subunit", metavar="<subunit file>", required=True,
             default=None, help="The path to the subunit output file.")
 
         self.add_argument(
@@ -152,7 +199,7 @@ class ArgumentParser(argparse.ArgumentParser):
 
         self.add_argument(
             "-o", "--output-file", metavar="<output file>", default=None,
-            help="The output file name for the json.")
+            help="The output file name for the json.", required=True)
 
         self.add_argument(
             "-p", "--ports", metavar="<ports file>", default=None,
