@@ -122,14 +122,14 @@ class UrlParser(testtools.TestResult):
                         "service": self.get_service(url_match.group("url")),
                         "url": self.url_path(url_match.group("url"))})
                 elif request_match is not None:
-                    in_request = True
+                    in_request, in_response = True, False
                     current_call.update({"request_headers": request_match.group(
                         "headers")})
                 elif in_request and body_match is not None:
                     in_request = False
                     current_call.update({"request_body": body_match.group("body")})
                 elif response_match is not None:
-                    in_response = True
+                    in_request, in_response = False, True
                     current_call.update({"response_headers": response_match.group(
                         "headers")})
                 elif in_response and body_match is not None:
