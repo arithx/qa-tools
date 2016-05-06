@@ -21,6 +21,7 @@ import io
 import json
 import os
 import re
+import sys
 
 import subunit
 import testtools
@@ -198,7 +199,7 @@ class ArgumentParser(argparse.ArgumentParser):
 
         self.add_argument(
             "-o", "--output-file", metavar="<output file>", default=None,
-            help="The output file name for the json.", required=True)
+            help="The output file name for the json, defaults to stdout.")
 
         self.add_argument(
             "-p", "--ports", metavar="<ports file>", default=None,
@@ -230,8 +231,28 @@ def parse(subunit_file, non_subunit_name, ports):
 
 
 def output(url_parser, output_file):
-    with open(output_file, "w") as outfile:
-        outfile.write(json.dumps(url_parser.test_logs))
+    if output_file is not None:
+        with open(output_file, "w") as outfile:
+            outfile.write(json.dumps(url_parser.test_logs))
+        return
+
+    for test_name, item in url_parser.test_logs.iteritems():
+        sys.stdout.write('{0}\n'.format(test_name))
+        if not item:
+            sys.stdout.write('\n')
+            continue
+        sys.stdout.write('\t- {0} {1} request for {2} to {3}\n'.format(
+            item.get('status_code'), item.get('verb'),
+            item.get('service'), item.get('url')))
+        sys.stdout.write('\t\t= Request Headers: {0}\n'.format(
+            item.get('request_headers')))
+        sys.stdout.write('\t\t= Request Body: {0}\n'.format(
+            item.get('request_body')))
+        sys.stdout.write('\t\t= Response Headers: {0}\n'.format(
+            item.get('response_headers')))
+        sys.stdout.write('\t\t= Response Body: {0}\n'.format(
+            item.get('response_body')))
+        sys.stdout.write('\n')
 
 
 def entry_point():
