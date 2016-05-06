@@ -123,18 +123,22 @@ class UrlParser(testtools.TestResult):
                         "url": self.url_path(url_match.group("url"))})
                 elif request_match is not None:
                     in_request, in_response = True, False
-                    current_call.update({"request_headers": request_match.group(
-                        "headers")})
+                    current_call.update(
+                        {"request_headers": request_match.group("headers")})
                 elif in_request and body_match is not None:
                     in_request = False
-                    current_call.update({"request_body": body_match.group("body")})
+                    current_call.update(
+                        {"request_body": body_match.group(
+                            "body")})
                 elif response_match is not None:
                     in_request, in_response = False, True
-                    current_call.update({"response_headers": response_match.group(
-                        "headers")})
+                    current_call.update(
+                        {"response_headers": response_match.group(
+                            "headers")})
                 elif in_response and body_match is not None:
                     in_response = False
-                    current_call.update({"response_body": body_match.group("body")})
+                    current_call.update(
+                        {"response_body": body_match.group("body")})
             if current_call != {}:
                 calls.append(current_call.copy())
 
@@ -236,22 +240,23 @@ def output(url_parser, output_file):
             outfile.write(json.dumps(url_parser.test_logs))
         return
 
-    for test_name, item in url_parser.test_logs.iteritems():
+    for test_name, items in url_parser.test_logs.iteritems():
         sys.stdout.write('{0}\n'.format(test_name))
-        if not item:
+        if not items:
             sys.stdout.write('\n')
             continue
-        sys.stdout.write('\t- {0} {1} request for {2} to {3}\n'.format(
-            item.get('status_code'), item.get('verb'),
-            item.get('service'), item.get('url')))
-        sys.stdout.write('\t\t= Request Headers: {0}\n'.format(
-            item.get('request_headers')))
-        sys.stdout.write('\t\t= Request Body: {0}\n'.format(
-            item.get('request_body')))
-        sys.stdout.write('\t\t= Response Headers: {0}\n'.format(
-            item.get('response_headers')))
-        sys.stdout.write('\t\t= Response Body: {0}\n'.format(
-            item.get('response_body')))
+            for item in items:
+                sys.stdout.write('\t- {0} {1} request for {2} to {3}\n'.format(
+                    item.get('status_code'), item.get('verb'),
+                    item.get('service'), item.get('url')))
+                sys.stdout.write('\t\t= Request Headers: {0}\n'.format(
+                    item.get('request_headers')))
+                sys.stdout.write('\t\t= Request Body: {0}\n'.format(
+                    item.get('request_body')))
+                sys.stdout.write('\t\t= Response Headers: {0}\n'.format(
+                    item.get('response_headers')))
+                sys.stdout.write('\t\t= Response Body: {0}\n'.format(
+                    item.get('response_body')))
         sys.stdout.write('\n')
 
 
